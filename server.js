@@ -6,7 +6,8 @@ const mongoose = require("mongoose");
 const { Server } = require("socket.io");
 
 const app = express();
-const origin = process.env.CLIENT_URL || "http://localhost:5173";
+let origin = (process.env.CLIENT_URL || "http://localhost:5173").trim().replace(/\/+$/, "");
+if (!/^https?:\/\//.test(origin)) origin = "https://" + origin;
 app.use(cors({ origin }));
 app.use(express.json());
 
