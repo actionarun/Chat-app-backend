@@ -16,11 +16,16 @@ module.exports = (io) => {
     socket.join(id); // private room per user
     io.emit("online-users", [...online.keys()]);
 
-    socket.on("send-message", async ({ receiverId, message }, ack) => {
-      if (!receiverId || !message || !message.trim()) return;
-      const saved = await Message.create({ senderId: id, receiverId, message: message.trim() });
-      io.to(receiverId).emit("receive-message", saved);   // to receiver
-      socket.to(id).emit("receive-message", saved);       // sender's other tabs
+        socket.on("send-message", async ({ receiverId, message, image }, ack) => {
+      const text = (message || "").trim();
+      const img = image || "";
+      if (!receiverId || (!text && !img)) return;
+      if (img && (!img.startsWith("data:image/") || img.length > 3_000_000)) {
+        return typeof ack === "function" && ack({ error: "Image is too large. Try a smaller photo." });
+      }
+      const saved = await Message.create({ senderId: id, receiverId, message: text, image: img });
+      io.to(receiverId).emit("receive-message", saved);
+      socket.to(id).emit("receive-message", saved);
       if (typeof ack === "function") ack(saved);
     });
 

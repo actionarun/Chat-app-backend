@@ -17,7 +17,7 @@ app.use("/api/users", require("./routes/users"));
 app.use("/api/messages", require("./routes/messages"));
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin } });
+const io = new Server(server, { cors: { origin }, maxHttpBufferSize: 5e6 });
 require("./socket/socket")(io);
 
 mongoose
