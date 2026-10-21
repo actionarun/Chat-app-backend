@@ -16,7 +16,8 @@ module.exports = (io) => {
     socket.join(id); // private room per user
     io.emit("online-users", [...online.keys()]);
 
-        socket.on("send-message", async ({ receiverId, message, image }, ack) => {
+    // SEND
+    socket.on("send-message", async ({ receiverId, message, image }, ack) => {
       const text = (message || "").trim();
       const img = image || "";
       if (!receiverId || (!text && !img)) return;
@@ -27,6 +28,39 @@ module.exports = (io) => {
       io.to(receiverId).emit("receive-message", saved);
       socket.to(id).emit("receive-message", saved);
       if (typeof ack === "function") ack(saved);
+    });
+
+    // EDIT (only your own messages)
+    socket.on("edit-message", async ({ messageId, message }, ack) => {
+      const reply = (r) => typeof ack === "function" && ack(r);
+      try {
+        const text = (message || "").trim();
+        if (text.length > 2000) return reply({ error: "Message is too long." });
+        const m = await Message.findById(messageId);
+        if (!m || m.senderId !== id) return reply({ error: "You can only edit your own messages." });
+        if (m.deleted) return reply({ error: "This message was deleted." });
+        if (!text && !m.image) return reply({ error: "Message can't be empty." });
+        m.message = text;
+        m.edited = true;
+        await m.save();
+        io.to(m.receiverId).to(id).emit("message-updated", m);
+        reply(m);
+      } catch { reply({ error: "Could not edit the message." }); }
+    });
+
+    // DELETE for everyone (only your own messages)
+    socket.on("delete-message", async ({ messageId }, ack) => {
+      const reply = (r) => typeof ack === "function" && ack(r);
+      try {
+        const m = await Message.findById(messageId);
+        if (!m || m.senderId !== id) return reply({ error: "You can only delete your own messages." });
+        m.deleted = true;
+        m.message = "";
+        m.image = "";
+        await m.save();
+        io.to(m.receiverId).to(id).emit("message-updated", m);
+        reply(m);
+      } catch { reply({ error: "Could not delete the message." }); }
     });
 
     socket.on("disconnect", () => {
